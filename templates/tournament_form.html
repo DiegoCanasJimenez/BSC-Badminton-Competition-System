@@ -1,0 +1,111 @@
+{% extends "base.html" %}
+{% block title %}{{ 'Edit tournament' if editing else 'New tournament' }}{% endblock %}
+
+{% block content %}
+<div class="card form-card">
+    <h1>{{ 'Edit tournament' if editing else 'New tournament' }}</h1>
+    {% if locked %}
+        <p class="flash flash-info">The tournament has started, so only the name, the date and the leagues
+            can be changed. The other settings are used by the schedule.</p>
+    {% endif %}
+
+    <form method="post" class="form">
+        <label>Name of the tournament
+            <input type="text" name="name" value="{{ values.name }}" required maxlength="100"
+                   placeholder="e.g. BSC Leiden Winter Cup">
+        </label>
+
+        <label>Date
+            <input type="date" name="date" value="{{ values.date }}" required>
+        </label>
+
+        <fieldset {% if locked %}disabled{% endif %}>
+            <legend>Singles or doubles?</legend>
+            <div class="choice-row">
+                <label class="choice">
+                    <input type="radio" name="game_type" value="singles" {% if values.game_type == 'singles' %}checked{% endif %}>
+                    Singles <small>(1 player per team)</small>
+                </label>
+                <label class="choice">
+                    <input type="radio" name="game_type" value="doubles" {% if values.game_type == 'doubles' %}checked{% endif %}>
+                    Doubles <small>(2 players per team)</small>
+                </label>
+            </div>
+        </fieldset>
+
+        <fieldset>
+            <legend>Leagues</legend>
+            <p class="small muted">Teams only play against teams of their own league. Change the names,
+                add a league or remove one. A league that still has teams cannot be removed.</p>
+            <div class="league-rows" id="league-rows">
+                {% for league in leagues %}
+                    <div class="league-row">
+                        <input type="hidden" name="league_id" value="{{ league.league_id or '' }}">
+                        <input type="text" name="league_name" value="{{ league.name }}" maxlength="40"
+                               placeholder="League name" aria-label="League name">
+                        <span class="small muted league-count">
+                            {% if league.team_count %}{{ league.team_count }} team{{ '' if league.team_count == 1 else 's' }}{% endif %}
+                        </span>
+                        <button type="button" class="button button-small remove-league" title="Remove this league"
+                                {% if league.team_count %}disabled{% endif %}>✕</button>
+                    </div>
+                {% endfor %}
+            </div>
+            <button type="button" class="button button-small" id="add-league">+ Add league</button>
+        </fieldset>
+
+        <div class="form-row">
+            <label>Number of courts
+                <input type="number" name="num_courts" min="1" max="40" value="{{ values.num_courts }}" required {% if locked %}disabled{% endif %}>
+            </label>
+            <label>Expected number of people
+                <input type="number" name="expected_people" min="0" value="{{ values.expected_people }}" required {% if locked %}disabled{% endif %}>
+                <small class="muted">Goes up automatically when more people are added.</small>
+            </label>
+        </div>
+
+        <fieldset {% if locked %}disabled{% endif %}>
+            <legend>How long should the whole tournament last?</legend>
+            <div class="form-row">
+                <label>Hours
+                    <input type="number" name="duration_hours" min="0" max="24" value="{{ values.duration_hours }}">
+                </label>
+                <label>Minutes
+                    <input type="number" name="duration_minutes" min="0" max="59" value="{{ values.duration_minutes }}">
+                </label>
+            </div>
+        </fieldset>
+
+        <fieldset {% if locked %}disabled{% endif %}>
+            <legend>Repetition</legend>
+            <label class="choice">
+                <input type="checkbox" name="allow_repetition" value="yes" {% if values.allow_repetition %}checked{% endif %}>
+                Teams may play against the same team more than once
+                <small>(only used to fill free courts; kept as low and as fair as possible)</small>
+            </label>
+        </fieldset>
+
+        <div class="button-row">
+            <button class="button button-primary" type="submit">{{ 'Save changes' if editing else 'Create tournament' }}</button>
+            {% if editing %}
+                <a class="button" href="{{ url_for('dashboard', tournament_id=tournament.tournament_id) }}">Cancel</a>
+            {% else %}
+                <a class="button" href="{{ url_for('index') }}">Cancel</a>
+            {% endif %}
+        </div>
+    </form>
+
+    {% if editing %}
+        <form method="post" action="{{ url_for('delete_tournament', tournament_id=tournament.tournament_id) }}"
+              class="danger-zone" data-confirm="Delete this tournament with all teams and results? This cannot be undone.">
+            <button class="button button-danger" type="submit">Delete tournament</button>
+        </form>
+    {% endif %}
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    setUpLeagueRows();
+</script>
+{% endblock %}

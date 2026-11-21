@@ -1,0 +1,283 @@
+{% extends "base.html" %}
+{% block title %}{{ tournament.name }}{% endblock %}
+
+{% block content %}
+{% set tid = tournament.tournament_id %}
+
+<a class="back-link" href="{{ url_for('index') }}">← All tournaments</a>
+
+<!-- ============ Title + START button ============ -->
+<div class="page-title">
+    <div>
+        <h1>{{ tournament.name }}</h1>
+    </div>
+    <div class="title-actions">
+        {% if started %}
+            {% if total_games > 0 and finished_games == total_games %}
+                <span class="status status-finished status-big">FINISHED</span>
+            {% else %}
+                <span class="status status-live status-big">IN PROGRESS</span>
+            {% endif %}
+        {% elif is_manager %}
+            <form method="post" action="{{ url_for('start_tournament', tournament_id=tid) }}"
+                  data-confirm="Start the tournament now? The schedule will be built and the clock starts.">
+                <button class="button button-start" type="submit">▶ START tournament</button>
+            </form>
+        {% else %}
+            <span class="status status-preparing status-big">PREPARING TOURNAMENT</span>
+        {% endif %}
+    </div>
+</div>
+
+{% if is_manager %}
+<div class="manager-bar">
+    <a class="button" href="{{ url_for('index') }}">⌂ Main screen</a>
+    <a class="button button-primary" href="{{ url_for('add_teams', tournament_id=tid) }}">+ Add teams</a>
+    <a class="button" href="#teams" data-open-details="teams">👥 Edit teams</a>
+    <a class="button" href="{{ url_for('edit_tournament', tournament_id=tid) }}">✎ Edit tournament</a>
+</div>
+{% endif %}
+
+<!-- ============ Key numbers ============ -->
+<div class="stats">
+    <div class="stat stat-highlight">
+        <span class="stat-label">Time per game</span>
+        <span class="stat-value">{{ game_minutes }} min</span>
+        <span class="stat-note">+ {{ pause_minutes }} min break between games
+            {% if not started %}<br>estimate based on {{ estimate_basis }}{% endif %}</span>
+    </div>
+    <div class="stat">
+        <span class="stat-label">Expected end</span>
+        {% if estimated_end %}
+            <span class="stat-value">{{ '~' if end_is_guess }}{{ clock(estimated_end) }}</span>
+            <span class="stat-note">
+                {% if end_is_guess %}
+                    if started now
+                {% elif minutes_late is not none and minutes_late > 0 %}
+                    <span class="late">{{ minutes_late }} min later than planned</span>
+                {% else %}
+                    on time
+                {% endif %}
+                · planned {{ duration_text(tournament.expected_minutes) }}
+            </span>
+        {% else %}
+            <span class="stat-value">--:--</span>
+            <span class="stat-note">known after START · planned {{ duration_text(tournament.expected_minutes) }}</span>
+        {% endif %}
+    </div>
+    {% if started %}
+    <div class="stat">
+        <span class="stat-label">Games played</span>
+        <span class="stat-value">{{ finished_games }} / {{ total_games }}</span>
+        <span class="stat-note">current batch: {{ tournament.current_batch }}</span>
+    </div>
+    {% endif %}
+</div>
+
+{% if game_minutes < 8 and number_of_batches > 0 %}
+    <div class="flash flash-error">Warning: there is very little time per game. Add courts, make the tournament
+        longer or use fewer teams.</div>
+{% endif %}
+
+<!-- ============ One panel per league: ranking + games ============ -->
+{# One line of the games list: court, the two teams, the score when finished #}
+{% macro game_line(game) %}
+    <li class="{{ 'is-done' if game.finished }}">
+        <span class="court-chip">Court {{ game.court }}</span>
+        <span class="vs">
+            <a class="team-link" href="{{ url_for('team_history', team_id=game.team1_id) }}">{{ names[game.team1_id] }}</a>
+            <em>vs</em>
+            <a class="team-link" href="{{ url_for('team_history', team_id=game.team2_id) }}">{{ names[game.team2_id] }}</a>
+        </span>
+        {% if game.finished %}
+            <span class="score-chip">{{ game.score1 }} – {{ game.score2 }}</span>
+        {% endif %}
+    </li>
+{% endmacro %}
+
+<section class="league-section" id="leagues" data-tournament="{{ tid }}">
+    <!-- The tabs: click a league to see its panel -->
+    <div class="league-tabs" role="tablist" aria-label="Leagues">
+        {% for panel in panels %}
+            <button type="button" class="league-tab {{ 'is-active' if loop.first }}" role="tab"
+                    data-league="{{ panel.league.league_id }}" aria-selected="{{ 'true' if loop.first else 'false' }}">
+                {{ panel.league.name }}
+                <small>{{ panel.team_count }} team{{ '' if panel.team_count == 1 else 's' }}</small>
+            </button>
+        {% endfor %}
+    </div>
+
+    {% if not panels %}
+        <div class="card"><p class="muted">This tournament has no leagues yet.
+            {% if is_manager %}Add them with <a href="{{ url_for('edit_tournament', tournament_id=tid) }}">Edit tournament</a>.{% endif %}</p></div>
+    {% endif %}
+
+    {% for panel in panels %}
+    <div class="league-panel" data-league="{{ panel.league.league_id }}" role="tabpanel" {% if not loop.first %}hidden{% endif %}>
+        <div class="two-columns">
+            <!-- Ranking of this league -->
+            <section class="card">
+                <h2>Ranking · {{ panel.league.name }}</h2>
+                <p class="small muted">Win = 2 points, loss = 0 points. Ties are split by point difference.</p>
+                {% if panel.ranking %}
+                    <div class="table-scroll">
+                    <table class="ranking">
+                        <thead>
+                            <tr><th>#</th><th class="left">Team</th><th>P</th><th>W</th><th>L</th><th title="Point difference">+/-</th><th>Pts</th></tr>
+                        </thead>
+                        <tbody>
+                            {% for line in panel.ranking %}
+                                <tr class="{{ 'first-place' if line.position == 1 and line.played > 0 }}">
+                                    <td>{{ line.position }}</td>
+                                    <td class="left"><a class="team-link" href="{{ url_for('team_history', team_id=line.team_id) }}">{{ line.team_name }}</a></td>
+                                    <td>{{ line.played }}</td>
+                                    <td>{{ line.won }}</td>
+                                    <td>{{ line.lost }}</td>
+                                    <td>{{ '%+d'|format(line.difference) if line.played else 0 }}</td>
+                                    <td class="points">{{ line.points }}</td>
+                                </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                    </div>
+                {% else %}
+                    <p class="muted">No teams in this league yet.</p>
+                {% endif %}
+            </section>
+
+            <!-- Games of this league -->
+            <section class="card games-card">
+                <h2>Games · {{ panel.league.name }}</h2>
+                {% if not started %}
+                    <p class="muted">The schedule appears here as soon as the tournament starts.</p>
+                {% else %}
+                    <!-- Current games: this league's games in the batch that is being played now -->
+                    <div class="current-games">
+                        <div class="upcoming-head">
+                            <h3>Current games · Batch {{ tournament.current_batch }}</h3>
+                            {% if current_start %}<span class="time-chip time-chip-gold">{{ clock(current_start) }}</span>{% endif %}
+                        </div>
+                        {% if panel.current_games %}
+                            <ul class="upcoming-list">
+                                {% for game in panel.current_games %}{{ game_line(game) }}{% endfor %}
+                            </ul>
+                        {% else %}
+                            <p class="muted">No {{ panel.league.name }} games in this batch.</p>
+                        {% endif %}
+                    </div>
+
+                    <!-- Upcoming games: every later batch with a game of this league -->
+                    <h3 class="upcoming-title">Upcoming games</h3>
+                    {% if panel.upcoming %}
+                        <div class="upcoming-scroll">
+                            {% for batch, start_text, batch_games in panel.upcoming %}
+                                <div class="upcoming-batch">
+                                    <div class="upcoming-head">
+                                        <strong>Batch {{ batch }}</strong>
+                                        <span class="time-chip">~ {{ clock(start_text) }}</span>
+                                    </div>
+                                    <ul class="upcoming-list">
+                                        {% for game in batch_games %}{{ game_line(game) }}{% endfor %}
+                                    </ul>
+                                </div>
+                            {% endfor %}
+                        </div>
+                    {% else %}
+                        <p class="muted">No more {{ panel.league.name }} games after this batch. 🏆</p>
+                    {% endif %}
+                {% endif %}
+            </section>
+        </div>
+    </div>
+    {% endfor %}
+</section>
+
+<!-- ============ Schedule slides (loaded only when opened) ============ -->
+{% if started %}
+<section class="card" id="schedule">
+    <div class="section-head">
+        <h2>Schedule</h2>
+        {% if is_manager %}<span class="small muted">Tap a court to add a result or change its batch.</span>{% endif %}
+    </div>
+
+    {% if number_of_batches == 0 %}
+        <p class="muted">There are no games in the schedule (a league needs at least 2 teams).</p>
+    {% else %}
+    <div class="batch-nav" id="batch-nav"
+         data-base-url="{{ url_for('batch_slide', tournament_id=tid, batch=1)[:-1] }}"
+         data-current="{{ tournament.current_batch }}"
+         data-open="{{ open_batch or '' }}"
+         data-last="{{ number_of_batches }}">
+        <button class="button button-small" type="button" id="batch-prev" aria-label="Previous batch">◀</button>
+        <div class="batch-pills" id="batch-pills">
+            {% for b in range(1, number_of_batches + 1) %}
+                <button type="button" class="batch-pill {{ 'is-current' if b == tournament.current_batch }}" data-batch="{{ b }}">
+                    Batch {{ b }}<small>{{ clock(start_texts[b]) }}</small>
+                </button>
+            {% endfor %}
+        </div>
+        <button class="button button-small" type="button" id="batch-next" aria-label="Next batch">▶</button>
+    </div>
+    <p class="small muted swipe-hint">Tip: swipe left or right on the courts to change batch.</p>
+
+    <div class="slide-area" id="slide-area">
+        <p class="muted slide-loading">Loading batch {{ tournament.current_batch }}…</p>
+    </div>
+    {% endif %}
+</section>
+{% endif %}
+
+<!-- ============ Teams ============ -->
+<section class="card" id="teams">
+    <details {% if not started %}open{% endif %}>
+        <summary><h2>Teams ({{ teams|length }})</h2></summary>
+        {% if is_manager and teams %}
+            <p class="small muted">Use <strong>✎ Edit</strong> to change a team name or member; the change is shown
+                everywhere. <strong>✕</strong> removes a team{% if started %} and plans the remaining games again{% endif %}.</p>
+        {% endif %}
+        {% if not teams %}
+            <p class="muted">No teams yet.
+                {% if is_manager %}<a href="{{ url_for('add_teams', tournament_id=tid) }}">Add teams</a>{% endif %}</p>
+        {% endif %}
+        {% for league in leagues %}
+            {% set league_teams = teams|selectattr('league_id', 'equalto', league.league_id)|list %}
+            {% if league_teams %}
+                <h3 class="division-title">{{ league.name }}</h3>
+                <ul class="team-list">
+                    {% for team in league_teams %}
+                        <li>
+                            <span class="team-info">
+                                <a class="team-link" href="{{ url_for('team_history', team_id=team.team_id) }}"><strong>{{ team.team_name }}</strong></a>
+                                <span class="muted">{{ team.member1 }}{% if team.member2 %} & {{ team.member2 }}{% endif %}</span>
+                            </span>
+                            {% if is_manager %}
+                                <span class="team-actions">
+                                    <a class="button button-small" href="{{ url_for('edit_team', team_id=team.team_id, next=request.path) }}"
+                                       title="Edit team" aria-label="Edit {{ team.team_name }}">✎ Edit</a>
+                                    <form method="post" action="{{ url_for('delete_team', team_id=team.team_id) }}"
+                                          data-confirm="{{ remove_team_warning(team.team_name, started, played.get(team.team_id, 0)) }}">
+                                        <button class="button button-small button-danger" type="submit"
+                                                title="Remove team" aria-label="Remove {{ team.team_name }}">✕</button>
+                                    </form>
+                                </span>
+                            {% endif %}
+                        </li>
+                    {% endfor %}
+                </ul>
+            {% endif %}
+        {% endfor %}
+    </details>
+</section>
+
+<!-- ============ Pop-up windows for managers ============ -->
+{% if is_manager and started %}
+    {% include "manager_modals.html" %}
+{% endif %}
+{% endblock %}
+
+{% block scripts %}
+<script>
+    setUpLeagueTabs();
+    {% if started and number_of_batches > 0 %}setUpSchedule();{% endif %}
+</script>
+{% endblock %}

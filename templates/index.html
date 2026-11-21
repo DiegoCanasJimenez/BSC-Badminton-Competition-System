@@ -1,0 +1,50 @@
+{% extends "base.html" %}
+{% block title %}Tournaments{% endblock %}
+
+{% block content %}
+<div class="page-title">
+    <div>
+        <h1>Tournaments</h1>
+        <p class="muted">Browse the badminton tournaments of {{ organizer }}, their schedules and results.</p>
+    </div>
+    {% if is_manager %}
+        <a class="button button-primary button-big" href="{{ url_for('new_tournament') }}">+ Add tournament</a>
+    {% endif %}
+</div>
+
+{% if tournaments %}
+    <div class="card-grid">
+        {% for t in tournaments %}
+            {% if t.status == 'preparing' %}
+                {% set label = 'Preparing' %}{% set label_class = 'status-preparing' %}
+            {% elif t.game_count > 0 and t.finished_count == t.game_count %}
+                {% set label = 'Finished' %}{% set label_class = 'status-finished' %}
+            {% else %}
+                {% set label = 'In progress' %}{% set label_class = 'status-live' %}
+            {% endif %}
+            <a class="card tournament-card" href="{{ url_for('dashboard', tournament_id=t.tournament_id) }}">
+                <div class="tournament-card-top">
+                    <span class="status {{ label_class }}">{{ label }}</span>
+                    <span class="muted">{{ t.date }}</span>
+                </div>
+                <h2>{{ t.name }}</h2>
+                <p class="muted">
+                    {{ t.game_type|capitalize }} · {{ t.num_courts }} courts · {{ t.team_count }} teams
+                </p>
+                {% if t.game_count > 0 %}
+                    <div class="progress"><div style="width: {{ (100 * t.finished_count / t.game_count)|round|int }}%"></div></div>
+                    <p class="small muted">{{ t.finished_count }} of {{ t.game_count }} games played
+                        {% if label == 'In progress' and t.expected_end %}· expected end <strong>{{ clock(t.expected_end) }}</strong>{% endif %}</p>
+                {% endif %}
+            </a>
+        {% endfor %}
+    </div>
+{% else %}
+    <div class="card empty">
+        <p>There are no tournaments yet.</p>
+        {% if is_manager %}
+            <a class="button button-primary" href="{{ url_for('new_tournament') }}">+ Add the first tournament</a>
+        {% endif %}
+    </div>
+{% endif %}
+{% endblock %}

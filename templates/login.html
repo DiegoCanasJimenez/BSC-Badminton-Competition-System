@@ -1,0 +1,18 @@
+{% extends "base.html" %}
+{% block title %}Manager login{% endblock %}
+
+{% block content %}
+<div class="card narrow">
+    <h1>Manager login</h1>
+    <p class="muted">Only managers need to log in. Everybody else can browse the tournaments without an account.</p>
+    <form method="post" class="form">
+        <label>Username
+            <input type="text" name="username" required autofocus autocomplete="username">
+        </label>
+        <label>Password
+            <input type="password" name="password" required autocomplete="current-password">
+        </label>
+        <button class="button button-primary" type="submit">Log in</button>
+    </form>
+</div>
+{% endblock %}

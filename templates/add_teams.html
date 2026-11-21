@@ -1,0 +1,56 @@
+{% extends "base.html" %}
+{% block title %}Add teams{% endblock %}
+
+{% block content %}
+<div class="card form-card wide">
+    <h1>Add teams</h1>
+    <p class="muted">{{ tournament.name }} · {{ tournament.game_type|capitalize }}.
+        Fill in one team per row. Click <strong>+ Add another team</strong> for more rows.
+        Empty rows are ignored.</p>
+    {% if tournament.status == 'started' %}
+        <p class="flash flash-info">This tournament has already started. New teams are added to the games
+            that are not played yet. All results so far are kept.</p>
+    {% endif %}
+
+    <form method="post" class="form" id="teams-form">
+        <div class="team-rows" id="team-rows">
+            {% for row in rows %}
+                <div class="team-row">
+                    <label>Team name
+                        <input type="text" name="team_name" value="{{ row.team_name }}" maxlength="60" placeholder="e.g. Leiden Team CS">
+                    </label>
+                    <label>{{ 'Member 1' if doubles else 'Player' }}
+                        <input type="text" name="member1" value="{{ row.member1 }}" maxlength="60">
+                    </label>
+                    {% if doubles %}
+                        <label>Member 2
+                            <input type="text" name="member2" value="{{ row.member2 }}" maxlength="60">
+                        </label>
+                    {% endif %}
+                    <label>League
+                        <select name="league_id">
+                            {% for league in leagues %}
+                                <option value="{{ league.league_id }}" {% if row.league_id == league.league_id %}selected{% endif %}>{{ league.name }}</option>
+                            {% endfor %}
+                        </select>
+                    </label>
+                    <button type="button" class="button button-small remove-row" title="Remove this row">✕</button>
+                </div>
+            {% endfor %}
+        </div>
+
+        <button type="button" class="button" id="add-row">+ Add another team</button>
+
+        <div class="button-row">
+            <button class="button button-primary" type="submit">Save teams</button>
+            <a class="button" href="{{ url_for('dashboard', tournament_id=tournament.tournament_id) }}">Cancel</a>
+        </div>
+    </form>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    setUpTeamRows();
+</script>
+{% endblock %}

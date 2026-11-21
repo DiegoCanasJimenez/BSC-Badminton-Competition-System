@@ -1,0 +1,30 @@
+{# Pop-up windows for managers, used on the dashboard and on the team history page.
+   'return_to' (optional) = the page to come back to after saving. #}
+<div class="modal" id="game-modal" hidden>
+    <div class="modal-box">
+        <button class="modal-close" type="button" data-close-modal aria-label="Close">✕</button>
+        <div id="game-modal-content">Loading…</div>
+    </div>
+</div>
+
+<div class="modal" id="time-modal" hidden>
+    <div class="modal-box modal-small">
+        <button class="modal-close" type="button" data-close-modal aria-label="Close">✕</button>
+        <h3>When did batch <span id="time-batch-label"></span> really start?</h3>
+        <p class="small muted">Drag or scroll the wheels. The batches after this one are recalculated.</p>
+        <div class="wheel-picker">
+            <div class="wheel" id="hour-wheel"></div>
+            <div class="wheel-colon">:</div>
+            <div class="wheel" id="minute-wheel"></div>
+            <div class="wheel-highlight"></div>
+        </div>
+        <form method="post" id="time-form">
+            <input type="hidden" name="time" id="time-value">
+            {% if return_to %}<input type="hidden" name="next" value="{{ return_to }}">{% endif %}
+            <div class="button-row">
+                <button class="button" type="button" data-close-modal>Cancel</button>
+                <button class="button button-primary" type="submit">Apply <span id="time-preview"></span></button>
+            </div>
+        </form>
+    </div>
+</div>

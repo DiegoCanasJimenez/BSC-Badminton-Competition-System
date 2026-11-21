@@ -1,0 +1,119 @@
+{% extends "base.html" %}
+{% block title %}{{ team.team_name }}{% endblock %}
+
+{% block content %}
+<a class="back-link" href="{{ url_for('dashboard', tournament_id=tournament.tournament_id) }}">← {{ tournament.name }}</a>
+
+<div class="page-title">
+    <div>
+        <h1>{{ team.team_name }}</h1>
+        <p class="muted">{{ team.member1 }}{% if team.member2 %} & {{ team.member2 }}{% endif %} ·
+            {{ league_name }} league</p>
+    </div>
+    {% if is_manager %}
+        <div class="title-actions button-row">
+            <a class="button" href="{{ url_for('edit_team', team_id=team.team_id) }}">✎ Edit team</a>
+            <form method="post" action="{{ url_for('delete_team', team_id=team.team_id) }}"
+                  data-confirm="{{ remove_team_warning(team.team_name, tournament.status == 'started', finished_games) }}">
+                <button class="button button-danger" type="submit">✕ Remove team</button>
+            </form>
+        </div>
+    {% endif %}
+</div>
+
+{% if ranking_line %}
+<div class="stats">
+    <div class="stat stat-highlight">
+        <span class="stat-label">Ranking</span>
+        <span class="stat-value">#{{ ranking_line.position }}</span>
+        <span class="stat-note">in the {{ league_name }} league</span>
+    </div>
+    <div class="stat">
+        <span class="stat-label">Points</span>
+        <span class="stat-value">{{ ranking_line.points }}</span>
+        <span class="stat-note">point difference {{ '%+d'|format(ranking_line.difference) }}</span>
+    </div>
+    <div class="stat">
+        <span class="stat-label">Won / lost</span>
+        <span class="stat-value">{{ ranking_line.won }} / {{ ranking_line.lost }}</span>
+        <span class="stat-note">{{ ranking_line.played }} of {{ matches|length }} games played</span>
+    </div>
+</div>
+{% endif %}
+
+<section class="card">
+    <h2>Match history</h2>
+    {% if not matches %}
+        <p class="muted">No matches yet. The matches appear here when the tournament starts.</p>
+    {% else %}
+        <p class="small muted">
+            <span class="legend legend-won">Won</span>
+            <span class="legend legend-lost">Lost</span>
+            Start times marked with ~ are estimates.
+            {% if is_manager %}Use the buttons of a match to change its score, batch or start time.{% endif %}
+        </p>
+        <div class="table-scroll">
+            <table class="history history-cards">
+                <thead>
+                    <tr>
+                        <th>Batch</th>
+                        <th>Court</th>
+                        <th>Started</th>
+                        <th class="left">Opponent</th>
+                        <th>Score</th>
+                        <th>Ended</th>
+                        <th>Result</th>
+                        {% if is_manager %}<th>Manager</th>{% endif %}
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for match in matches %}
+                        {% set game = match.game %}
+                        <tr class="{{ 'row-' ~ match.result if match.result }} {{ 'row-current' if game.batch == tournament.current_batch }}">
+                            <td data-label="Batch"><strong>{{ game.batch }}</strong></td>
+                            <td data-label="Court">{{ game.court }}</td>
+                            <td class="nowrap" data-label="Started">{{ '' if match.start_is_real else '~ ' }}{{ clock(match.start) }}</td>
+                            <td class="left cell-opponent" data-label="Opponent">
+                                <a class="team-link" href="{{ url_for('team_history', team_id=match.opponent_id) }}">{{ match.opponent_name }}</a>
+                            </td>
+                            <td class="nowrap score-cell" data-label="Score">
+                                {% if match.result %}{{ match.my_score }} – {{ match.their_score }}{% else %}–{% endif %}
+                            </td>
+                            <td class="nowrap" data-label="Ended">{{ clock(match.ended) if match.ended else '–' }}</td>
+                            <td class="cell-result" data-label="Result">
+                                {% if match.result == 'won' %}
+                                    <span class="result-badge result-won">WON</span>
+                                {% elif match.result == 'lost' %}
+                                    <span class="result-badge result-lost">LOST</span>
+                                {% elif game.batch == tournament.current_batch %}
+                                    <span class="status status-live">Playing now</span>
+                                {% else %}
+                                    <span class="muted small">Planned</span>
+                                {% endif %}
+                            </td>
+                            {% if is_manager %}
+                                <td class="nowrap cell-manager"><div class="manager-buttons">
+                                    <button type="button" class="button button-small"
+                                            data-game-url="{{ url_for('game_options', game_id=game.game_id, next=request.path) }}">
+                                        ✎ {{ 'Edit score' if match.result else 'Score / batch' }}
+                                    </button>
+                                    <button type="button" class="button button-small update-time-button"
+                                            data-batch="{{ game.batch }}" data-time="{{ clock(match.start) }}"
+                                            data-url="{{ url_for('update_batch_time', tournament_id=tournament.tournament_id, batch=game.batch) }}">
+                                        🕑 Update start time
+                                    </button>
+                                </div></td>
+                            {% endif %}
+                        </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    {% endif %}
+</section>
+
+{% if is_manager and matches %}
+    {% set return_to = request.path %}
+    {% include "manager_modals.html" %}
+{% endif %}
+{% endblock %}

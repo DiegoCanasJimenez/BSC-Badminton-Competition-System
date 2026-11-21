@@ -1,0 +1,66 @@
+{# One slide = one batch. This piece of HTML is loaded by script.js only when
+   somebody opens the batch, so the dashboard itself stays fast. #}
+<div class="slide" data-batch="{{ batch }}">
+    <div class="slide-header">
+        <div class="slide-title">
+            <span class="slide-batch">Batch {{ batch }}</span>
+            {% if batch == tournament.current_batch %}<span class="status status-live">Current batch</span>{% endif %}
+        </div>
+        <div class="start-time {{ 'is-real' if is_real_time }}">
+            <span class="start-time-label">{{ 'Started at' if is_real_time else 'Estimated start' }}</span>
+            <span class="start-time-value">{{ clock(start_text) }}</span>
+        </div>
+        {% if is_manager %}
+            <div class="slide-buttons">
+                <button type="button" class="button button-primary update-time-button"
+                        data-batch="{{ batch }}" data-time="{{ clock(start_text) }}"
+                        data-url="{{ url_for('update_batch_time', tournament_id=tournament.tournament_id, batch=batch) }}">
+                    🕑 Update start time
+                </button>
+                {% if batch != tournament.current_batch %}
+                    <form method="post" action="{{ url_for('make_current_batch', tournament_id=tournament.tournament_id, batch=batch) }}">
+                        <button type="submit" class="button button-gold">★ Make current batch</button>
+                    </form>
+                {% endif %}
+            </div>
+        {% endif %}
+    </div>
+
+    <div class="courts">
+        {% for court_number, game in courts %}
+            {% if game %}
+                {% set done = game.finished %}
+                {% set team1_won = done and game.score1 > game.score2 %}
+                <div class="court-box {{ 'is-finished' if done }} {{ 'is-clickable' if is_manager }}"
+                     {% if is_manager %}data-game-url="{{ url_for('game_options', game_id=game.game_id) }}" tabindex="0" role="button"{% endif %}>
+                    <div class="court-label">
+                        <span>Court {{ court_number }}</span>
+                        <span>{{ league_names[game.league_id] }}{% if done %} · ended {{ clock(game.finished_at) }}{% endif %}</span>
+                    </div>
+                    <div class="court">
+                        <div class="court-half {{ ('winner' if team1_won else 'loser') if done }}">
+                            <a class="team-name" href="{{ url_for('team_history', team_id=game.team1_id) }}" title="{{ names[game.team1_id] }}">{{ short_name(names[game.team1_id]) }}</a>
+                            {% if done %}<span class="score">{{ game.score1 }}</span>{% endif %}
+                            {% if done and team1_won %}<span class="medal">WIN</span>{% endif %}
+                        </div>
+                        <div class="net"></div>
+                        <div class="court-half right {{ ('loser' if team1_won else 'winner') if done }}">
+                            <a class="team-name" href="{{ url_for('team_history', team_id=game.team2_id) }}" title="{{ names[game.team2_id] }}">{{ short_name(names[game.team2_id]) }}</a>
+                            {% if done %}<span class="score">{{ game.score2 }}</span>{% endif %}
+                            {% if done and not team1_won %}<span class="medal">WIN</span>{% endif %}
+                        </div>
+                    </div>
+                </div>
+            {% else %}
+                <div class="court-box is-free">
+                    <div class="court-label"><span>Court {{ court_number }}</span><span>free</span></div>
+                    <div class="court">
+                        <div class="court-half"><span class="team-name muted-name">—</span></div>
+                        <div class="net"></div>
+                        <div class="court-half right"><span class="team-name muted-name">—</span></div>
+                    </div>
+                </div>
+            {% endif %}
+        {% endfor %}
+    </div>
+</div>

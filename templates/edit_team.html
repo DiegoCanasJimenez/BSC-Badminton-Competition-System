@@ -1,0 +1,63 @@
+{% extends "base.html" %}
+{% block title %}Edit {{ team.team_name }}{% endblock %}
+
+{% block content %}
+<a class="back-link" href="{{ next_page or url_for('team_history', team_id=team.team_id) }}">← Back</a>
+
+<div class="card form-card">
+    <h1>Edit team</h1>
+    <p class="muted">{{ tournament.name }} · {{ tournament.game_type|capitalize }}.
+        A new name or member is shown everywhere straight away: schedule, courts, ranking and match history.</p>
+
+    <form method="post" class="form">
+        <label>Team name
+            <input type="text" name="team_name" value="{{ row.team_name }}" maxlength="60" required>
+        </label>
+        <div class="form-row">
+            <label>{{ 'Member 1' if doubles else 'Player' }}
+                <input type="text" name="member1" value="{{ row.member1 }}" maxlength="60" required autocomplete="off">
+            </label>
+            {% if doubles %}
+                <label>Member 2
+                    <input type="text" name="member2" value="{{ row.member2 }}" maxlength="60" required autocomplete="off">
+                </label>
+            {% endif %}
+        </div>
+        <label>League
+            <select name="league_id" {% if started and finished_games %}disabled{% endif %}>
+                {% for league in leagues %}
+                    <option value="{{ league.league_id }}" {% if row.league_id == league.league_id %}selected{% endif %}>{{ league.name }}</option>
+                {% endfor %}
+            </select>
+            {% if started and finished_games %}
+                {# A disabled field is not sent, so send the current league along #}
+                <input type="hidden" name="league_id" value="{{ team.league_id }}">
+                <small class="muted">This team already finished {{ finished_games }} game(s), so its league cannot change any more.</small>
+            {% elif started %}
+                <small class="muted">Changing the league plans this team's games again (it has not finished a game yet).</small>
+            {% endif %}
+        </label>
+
+        {% if next_page %}<input type="hidden" name="next" value="{{ next_page }}">{% endif %}
+        <div class="button-row">
+            <button class="button button-primary" type="submit">Save changes</button>
+            <a class="button" href="{{ next_page or url_for('team_history', team_id=team.team_id) }}">Cancel</a>
+        </div>
+    </form>
+
+    <form method="post" action="{{ url_for('delete_team', team_id=team.team_id) }}" class="danger-zone"
+          data-confirm="{{ remove_team_warning(team.team_name, started, finished_games) }}">
+        <h2>Remove team</h2>
+        <p class="small muted">
+            {% if started %}
+                The team leaves the tournament. Its {{ planned_games }} game(s) that were not played yet are taken
+                out and the rest of the schedule is planned again.
+                {% if finished_games %}Its {{ finished_games }} finished game(s) no longer count for the ranking.{% endif %}
+            {% else %}
+                The team is removed from the tournament.
+            {% endif %}
+        </p>
+        <button class="button button-danger" type="submit">✕ Remove team</button>
+    </form>
+</div>
+{% endblock %}

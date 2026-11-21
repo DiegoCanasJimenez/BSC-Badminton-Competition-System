@@ -1,0 +1,67 @@
+{# The options that appear when a manager clicks on a court. Loaded into a pop-up by script.js #}
+{% set team1 = names[game.team1_id] %}
+{% set team2 = names[game.team2_id] %}
+
+<h3>Batch {{ game.batch }} · Court {{ game.court }}</h3>
+<p class="muted">{{ team1 }} <em>vs</em> {{ team2 }} ({{ league_names[game.league_id] }})</p>
+
+<!-- ===== Add results ===== -->
+<form method="post" action="{{ url_for('save_result', game_id=game.game_id) }}" class="result-form">
+    <h4>{{ 'Correct the score' if game.finished else 'Add results' }}</h4>
+    <div class="score-inputs">
+        <label>{{ team1 }}
+            <input type="number" name="score1" min="0" max="99" required inputmode="numeric" pattern="[0-9]*" value="{{ game.score1 if game.score1 is not none }}">
+        </label>
+        <span class="score-dash">–</span>
+        <label>{{ team2 }}
+            <input type="number" name="score2" min="0" max="99" required inputmode="numeric" pattern="[0-9]*" value="{{ game.score2 if game.score2 is not none }}">
+        </label>
+    </div>
+    <label class="ended-input">Game ended at
+        <input type="time" name="ended_at" value="{{ clock(game.finished_at) if game.finished_at }}">
+        <small class="muted">{{ 'Leave as it is to keep this end time.' if game.finished else 'Leave empty to use the current time.' }}</small>
+    </label>
+    {% if next_page %}<input type="hidden" name="next" value="{{ next_page }}">{% endif %}
+    <button class="button button-primary" type="submit">{{ 'Save score' if game.finished else '✔ Finish game' }}</button>
+    {% if game.finished %}
+        <p class="small muted">This game is finished, so only the score and end time can be changed.</p>
+    {% endif %}
+</form>
+
+<!-- ===== Change batch ===== -->
+{% if not game.finished %}
+<div class="move-options">
+    <h4>Change batch</h4>
+    {% if not moves_per_batch %}
+        <p class="muted">There is no batch this game can move to.</p>
+    {% else %}
+        <p class="small muted">Only batches from the current batch ({{ tournament.current_batch }}) onwards are shown.</p>
+        {% for target, options in moves_per_batch %}
+            <div class="move-batch">
+                <strong>To batch {{ target }}</strong>
+                {% for option in options %}
+                    <form method="post" action="{{ url_for('move_game', game_id=game.game_id) }}">
+                        <input type="hidden" name="target_batch" value="{{ target }}">
+                        {% if next_page %}<input type="hidden" name="next" value="{{ next_page }}">{% endif %}
+                        {% if option.swap_game %}
+                            {% set other = option.swap_game %}
+                            <input type="hidden" name="swap_game_id" value="{{ other.game_id }}">
+                            <button class="move-button" type="submit">
+                                Swap: Batch {{ target }}: game ({{ names[other.team1_id] }}, {{ names[other.team2_id] }}) → Batch {{ game.batch }}
+                            </button>
+                        {% else %}
+                            <button class="move-button" type="submit">
+                                {% if target > last_batch %}
+                                    Move to a new batch at the end
+                                {% else %}
+                                    Move to free court {{ option.court }}
+                                {% endif %}
+                            </button>
+                        {% endif %}
+                    </form>
+                {% endfor %}
+            </div>
+        {% endfor %}
+    {% endif %}
+</div>
+{% endif %}
